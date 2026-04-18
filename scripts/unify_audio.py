@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 
 def resample_write(src_path, dst_path, target_sr=22050):
-    audio, sr = librosa.load(src_path, sr=target_sr, mono=True)
+    audio, sr = librosa.load(src_path, sr=target_sr, mono=True, res_type='soxr_hq')
     sf.write(dst_path, audio, target_sr, subtype='PCM_16')
 
 
@@ -34,8 +34,8 @@ def process_ruslan(src_root, dst_root):
         src = os.path.join(wavs_dir, f"{base}.wav")
         if not os.path.isfile(src): continue
         resample_write(src, os.path.join(out_dir, f"{base}.wav"))
-        with open(os.path.join(out_dir, f"{base}.lab"), "w", encoding="utf-8") as g:
-            g.write(text)
+        with open(os.path.join(out_dir, f"{base}.lab"), "w", encoding="utf-8", newline="\n") as g:
+            g.write(text + "\n")
 
 
 def process_mailabs(src_root, dst_root):
@@ -65,8 +65,8 @@ def process_mailabs(src_root, dst_root):
                     if not os.path.isfile(src): continue
                     dst_base = f"{book}_{base}"
                     resample_write(src, os.path.join(out_dir, f"{dst_base}.wav"))
-                    with open(os.path.join(out_dir, f"{dst_base}.lab"), "w", encoding="utf-8") as g:
-                        g.write(text)
+                    with open(os.path.join(out_dir, f"{dst_base}.lab"), "w", encoding="utf-8", newline="\n") as g:
+                        g.write(text + "\n")
 
 
 def process_sova(src_root, dst_root, keep_speakers):
@@ -89,8 +89,8 @@ def process_sova(src_root, dst_root, keep_speakers):
             src_opus = os.path.join(sdir, f"{base}.opus")
             if not os.path.isfile(src_opus): continue
             resample_write(src_opus, os.path.join(out_dir, f"{base}.wav"))
-            with open(os.path.join(out_dir, f"{base}.lab"), "w", encoding="utf-8") as g:
-                g.write(text)
+            with open(os.path.join(out_dir, f"{base}.lab"), "w", encoding="utf-8", newline="\n") as g:
+                g.write(text + "\n")
 
 
 if __name__ == "__main__":

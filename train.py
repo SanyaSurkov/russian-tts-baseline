@@ -6,6 +6,7 @@ import yaml
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+from torch.cuda.amp import autocast, GradScaler
 from tqdm import tqdm
 
 from utils.model import get_model, get_vocoder, get_param_num
@@ -49,6 +50,9 @@ def main(args, configs):
     Loss = FastSpeech2Loss(preprocess_config, model_config).to(device)
     print("Number of FastSpeech2 Parameters:", num_param)
 
+    use_amp = train_config["optimizer"].get("use_amp", False)
+    scaler = GradScaler(enabled=use_amp)
+
     # Load vocoder
     vocoder = get_vocoder(model_config, device)
 
@@ -82,28 +86,21 @@ def main(args, configs):
         for batchs in loader:
             
             for batch in batchs:
-               # print(batch[9])
-               # print(len(batch[9]))
                 batch = to_device(batch, device)
-                #print(batch)
-               # print(len(batch))
-                #print('-------------------------------')
-                # Forward
-                output = model(*(batch[2:]))
 
-                # Cal Loss
-                losses = Loss(batch, output)
-                total_loss = losses[0]
+                with autocast(enabled=use_amp):
+                    output = model(*(batch[2:]))
+                    losses = Loss(batch, output)
+                    total_loss = losses[0] / grad_acc_step
 
-                # Backward
-                total_loss = total_loss / grad_acc_step
-                total_loss.backward()
+                scaler.scale(total_loss).backward()
+
                 if step % grad_acc_step == 0:
-                    # Clipping gradients to avoid gradient explosion
+                    scaler.unscale_(optimizer._optimizer)
                     nn.utils.clip_grad_norm_(model.parameters(), grad_clip_thresh)
-
-                    # Update weights
-                    optimizer.step_and_update_lr()
+                    scaler.step(optimizer._optimizer)
+                    scaler.update()
+                    optimizer._update_learning_rate()
                     optimizer.zero_grad()
 
                 if step % log_step == 0:
@@ -125,6 +122,7 @@ def main(args, configs):
                         {
                             "model": model.module.state_dict(),
                             "optimizer": optimizer._optimizer.state_dict(),
+                            "scaler": scaler.state_dict(),
                         },
                         os.path.join(
                             train_config["path"]["ckpt_path"],

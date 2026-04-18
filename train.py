@@ -52,6 +52,15 @@ def main(args, configs):
 
     use_amp = train_config["optimizer"].get("use_amp", False)
     scaler = GradScaler(enabled=use_amp)
+    if args.restore_step > 0:
+        ckpt_path = os.path.join(
+            train_config["path"]["ckpt_path"],
+            "{}.pth.tar".format(args.restore_step),
+        )
+        if os.path.isfile(ckpt_path):
+            ckpt = torch.load(ckpt_path, map_location=device)
+            if "scaler" in ckpt:
+                scaler.load_state_dict(ckpt["scaler"])
 
     # Load vocoder
     vocoder = get_vocoder(model_config, device)

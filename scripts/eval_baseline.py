@@ -51,7 +51,8 @@ def main(args):
     # body filled after train.py infrastructure is stable
     results = {}
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
-    json.dump(results, open(args.out, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
+    with open(args.out, "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=2, ensure_ascii=False)
     print(f"wrote {args.out} (skeleton)")
 
 

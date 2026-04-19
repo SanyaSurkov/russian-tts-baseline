@@ -62,31 +62,61 @@ class Preprocessor:
         pitch_scaler = StandardScaler()
         energy_scaler = StandardScaler()
 
-        # Compute pitch, energy, duration, and mel-spectrogram
+        total_speaker_dirs = 0
+        total_audios_found = 0
+        total_tg_found = 0
+        total_processed = 0
+
         speakers = {}
-        for i, speaker in enumerate(tqdm(os.listdir(self.in_dir))):
+        speaker_dirs = os.listdir(self.in_dir)
+        print(f"Содержимое raw_path ({self.in_dir}): {speaker_dirs}")
+
+        for i, speaker in enumerate(tqdm(speaker_dirs)):
+            speaker_path = os.path.join(self.in_dir, speaker)
+            if not os.path.isdir(speaker_path):
+                print(f"Пропускаем {speaker} — это не папка")
+                continue
+            total_speaker_dirs += 1
             speakers[speaker] = i
-           # print(os.listdir(self.in_dir))
-            for wav_name in tqdm(os.listdir(os.path.join(self.in_dir, speaker))):
-                #print(os.path.join(self.in_dir, speaker))
-                if ".wav" not in wav_name:
+
+            # Рекурсивный поиск .wav файлов
+            audio_files = []  # (subdir, basename, full_path)
+            for root, dirs, files in os.walk(speaker_path):
+                for f in files:
+                    if f.endswith('.wav'):
+                        full_path = os.path.join(root, f)
+                        rel_path = os.path.relpath(full_path, speaker_path)
+                        subdir = os.path.dirname(rel_path)
+                        if subdir == '.':
+                            subdir = ''
+                        basename = os.path.splitext(f)[0]
+                        audio_files.append((subdir, basename, full_path))
+
+            print(f"Диктор {speaker}: найдено {len(audio_files)} opus файлов")
+
+            for subdir, basename, full_audio_path in tqdm(audio_files):
+                total_audios_found += 1
+                # Путь к TextGrid с учётом диктора и подпапки
+                if subdir:
+                    tg_path = os.path.join(self.out_dir, "TextGrid", speaker, subdir, f"{basename}.TextGrid")
+                else:
+                    tg_path = os.path.join(self.out_dir, "TextGrid", speaker, f"{basename}.TextGrid")
+
+                if not os.path.exists(tg_path):
+                    if total_audios_found < 10:
+                        print(f"  Пропущен {basename}: нет TextGrid {tg_path}")
                     continue
 
-                basename = wav_name.split(".")[0]
-                tg_path = os.path.join(
-                    self.out_dir, "TextGrid", "{}.TextGrid".format(basename)
-                )
-                #print(tg_path)
-                if os.path.exists(tg_path):
-                   # print('-------------')
-                    ret = self.process_utterance(speaker, basename)
-                    if ret is None:
-                      #  print('000000000000')
-                        continue
-                    else:
-                        info, pitch, energy, n = ret
-                       # print('1111111111')
-                    out.append(info)
+                total_tg_found += 1
+                ret = self.process_utterance(speaker, basename, audio_path=full_audio_path, tg_path=tg_path)
+                if ret is None:
+                    if total_tg_found < 10:
+                        print(f"  process_utterance вернул None для {basename}")
+                    continue
+
+                total_processed += 1
+                info, pitch, energy, n = ret
+                out.append(info)
 
                 if len(pitch) > 0:
                     pitch_scaler.partial_fit(pitch.reshape((-1, 1)))
@@ -95,15 +125,30 @@ class Preprocessor:
 
                 n_frames += n
 
+        print("\n=== ДИАГНОСТИКА ===")
+        print(f"Всего папок дикторов: {total_speaker_dirs}")
+        print(f"Всего найдено opus файлов: {total_audios_found}")
+        print(f"Из них имеют TextGrid: {total_tg_found}")
+        print(f"Успешно обработано: {total_processed}")
+        print(f"Всего фреймов: {n_frames}")
+
         print("Computing statistic quantities ...")
-        # Perform normalization if necessary
+        if n_frames == 0:
+            raise RuntimeError(
+                "No data processed. Please ensure that:\n"
+                "1. TextGrid files exist in the 'TextGrid' subfolder of preprocessed_path,\n"
+                "   with structure: TextGrid/{speaker}/{subdir}/{basename}.TextGrid\n"
+                "2. Audio files contain sufficient voiced frames (pitch not all zeros).\n"
+                "3. The raw_path directory structure is correct."
+            )
+
         if self.pitch_normalization:
             pitch_mean = pitch_scaler.mean_[0]
             pitch_std = pitch_scaler.scale_[0]
         else:
-            # A numerical trick to avoid normalization...
             pitch_mean = 0
             pitch_std = 1
+
         if self.energy_normalization:
             energy_mean = energy_scaler.mean_[0]
             energy_std = energy_scaler.scale_[0]
@@ -118,7 +163,6 @@ class Preprocessor:
             os.path.join(self.out_dir, "energy"), energy_mean, energy_std
         )
 
-        # Save files
         with open(os.path.join(self.out_dir, "speakers.json"), "w") as f:
             f.write(json.dumps(speakers))
 
@@ -148,7 +192,6 @@ class Preprocessor:
         random.shuffle(out)
         out = [r for r in out if r is not None]
 
-        # Write metadata
         with open(os.path.join(self.out_dir, "train.txt"), "w", encoding="utf-8") as f:
             for m in out[self.val_size :]:
                 f.write(m + "\n")
@@ -158,14 +201,16 @@ class Preprocessor:
 
         return out
 
-    def process_utterance(self, speaker, basename):
-        wav_path = os.path.join(self.in_dir, speaker, "{}.wav".format(basename))
-        text_path = os.path.join(self.in_dir, speaker, "{}.lab".format(basename))
-        tg_path = os.path.join(
-            self.out_dir, "TextGrid", "{}.TextGrid".format(basename)
-        )
+    def process_utterance(self, speaker, basename, audio_path=None, tg_path=None):
+        if audio_path is None:
+            audio_path = os.path.join(self.in_dir, speaker, f"{basename}.wav")
+        if tg_path is None:
+            # fallback: предполагаем структуру TextGrid/{speaker}/{basename}.TextGrid (без подпапок)
+            tg_path = os.path.join(self.out_dir, "TextGrid", speaker, f"{basename}.TextGrid")
 
-        # Get alignments
+        wav_path = audio_path
+        text_path = os.path.splitext(wav_path)[0] + ".txt"
+
         textgrid = tgt.io.read_textgrid(tg_path)
         phone, duration, start, end = self.get_alignment(
             textgrid.get_tier_by_name("phones")
@@ -174,17 +219,14 @@ class Preprocessor:
         if start >= end:
             return None
 
-        # Read and trim wav files
         wav, _ = librosa.load(wav_path)
         wav = wav[
             int(self.sampling_rate * start) : int(self.sampling_rate * end)
         ].astype(np.float32)
 
-        # Read raw text
         with open(text_path, "r") as f:
             raw_text = f.readline().strip("\n")
 
-        # Compute fundamental frequency
         pitch, t = pw.dio(
             wav.astype(np.float64),
             self.sampling_rate,
@@ -196,13 +238,11 @@ class Preprocessor:
         if np.sum(pitch != 0) <= 1:
             return None
 
-        # Compute mel-scale spectrogram and energy
         mel_spectrogram, energy = Audio.tools.get_mel_from_wav(wav, self.STFT)
         mel_spectrogram = mel_spectrogram[:, : sum(duration)]
         energy = energy[: sum(duration)]
 
         if self.pitch_phoneme_averaging:
-            # perform linear interpolation
             nonzero_ids = np.where(pitch != 0)[0]
             interp_fn = interp1d(
                 nonzero_ids,
@@ -212,7 +252,6 @@ class Preprocessor:
             )
             pitch = interp_fn(np.arange(0, len(pitch)))
 
-            # Phoneme-level average
             pos = 0
             for i, d in enumerate(duration):
                 if d > 0:
@@ -223,7 +262,6 @@ class Preprocessor:
             pitch = pitch[: len(duration)]
 
         if self.energy_phoneme_averaging:
-            # Phoneme-level average
             pos = 0
             for i, d in enumerate(duration):
                 if d > 0:
@@ -233,7 +271,6 @@ class Preprocessor:
                 pos += d
             energy = energy[: len(duration)]
 
-        # Save files
         dur_filename = "{}-duration-{}.npy".format(speaker, basename)
         np.save(os.path.join(self.out_dir, "duration", dur_filename), duration)
 
@@ -267,7 +304,6 @@ class Preprocessor:
         for t in tier._objects:
             s, e, p = t.start_time, t.end_time, t.text
 
-            # Trim leading silences
             if phones == []:
                 if p in sil_phones:
                     continue
@@ -275,12 +311,10 @@ class Preprocessor:
                     start_time = s
 
             if p not in sil_phones:
-                # For ordinary phones
                 phones.append(p)
                 end_time = e
                 end_idx = len(phones)
             else:
-                # For silent phones
                 phones.append(p)
 
             durations.append(
@@ -290,7 +324,6 @@ class Preprocessor:
                 )
             )
 
-        # Trim tailing silences
         phones = phones[:end_idx]
         durations = durations[:end_idx]
 
@@ -303,7 +336,6 @@ class Preprocessor:
         lower = p25 - 1.5 * (p75 - p25)
         upper = p75 + 1.5 * (p75 - p25)
         normal_indices = np.logical_and(values > lower, values < upper)
-
         return values[normal_indices]
 
     def normalize(self, in_dir, mean, std):
@@ -313,8 +345,6 @@ class Preprocessor:
             filename = os.path.join(in_dir, filename)
             values = (np.load(filename) - mean) / std
             np.save(filename, values)
-
             max_value = max(max_value, max(values))
             min_value = min(min_value, min(values))
-
         return min_value, max_value

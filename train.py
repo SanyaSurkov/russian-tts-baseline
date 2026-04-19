@@ -36,6 +36,9 @@ def main(args, configs):
         batch_size=batch_size * group_size,
         shuffle=True,
         collate_fn=dataset.collate_fn,
+        num_workers=6,
+        pin_memory=True,
+        persistent_workers=True,
     )
 
     # Prepare model

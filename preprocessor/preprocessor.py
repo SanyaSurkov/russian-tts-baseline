@@ -209,7 +209,7 @@ class Preprocessor:
             tg_path = os.path.join(self.out_dir, "TextGrid", speaker, f"{basename}.TextGrid")
 
         wav_path = audio_path
-        text_path = os.path.splitext(wav_path)[0] + ".txt"
+        text_path = os.path.splitext(wav_path)[0] + ".lab"
 
         textgrid = tgt.io.read_textgrid(tg_path)
         phone, duration, start, end = self.get_alignment(

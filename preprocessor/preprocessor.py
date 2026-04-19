@@ -224,7 +224,7 @@ class Preprocessor:
             int(self.sampling_rate * start) : int(self.sampling_rate * end)
         ].astype(np.float32)
 
-        with open(text_path, "r") as f:
+        with open(text_path, "r", encoding="utf-8") as f:
             raw_text = f.readline().strip("\n")
 
         pitch, t = pw.dio(

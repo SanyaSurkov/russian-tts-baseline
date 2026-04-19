@@ -15,7 +15,7 @@ optimizer:
   use_amp: True
 step:
   total_step: 150000
-  log_step: 1000
-  synth_step: 1000
-  val_step: 1000
-  save_step: 10000
+  log_step: 360
+  synth_step: 1800
+  val_step: 1800
+  save_step: 1800

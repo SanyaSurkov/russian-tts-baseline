@@ -130,6 +130,7 @@ def get_vocoder(config, device):
 
 def vocoder_infer(mels, vocoder, model_config, preprocess_config, lengths=None):
     name = model_config["vocoder"]["model"]
+    mels = mels.float()
     with torch.no_grad():
         if name == "MelGAN":
             wavs = vocoder.inverse(mels / np.log(10))

@@ -104,7 +104,15 @@ valid_symbols = [
   'n̪',
   'ç',
   'a',
-  'f'
+  'f',
+
+  # M2: stressed vowel variants (MFA stressed-position labels)
+  'a+',
+  'e+',
+  'i+',
+  'o+',
+  'u+',
+  'ɨ+',
 
 ]
 

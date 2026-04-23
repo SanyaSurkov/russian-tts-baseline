@@ -1,0 +1,15 @@
+Scanned 42650 TextGrid files
+Unique vowel-like labels: 11
+
+label	count
+ɪ	219612
+ə	200191
+a	129899
+o	100325
+e	96870
+ɨ	78054
+i	77265
+ʊ	52206
+u	39988
+ɛ	13908
+ʉ	4318

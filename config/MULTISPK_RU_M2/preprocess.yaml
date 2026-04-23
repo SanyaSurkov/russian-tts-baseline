@@ -1,0 +1,30 @@
+dataset: "MULTISPK_RU_M2"
+
+path:
+  corpus_path: "C:/Users/Admin/thesis/data/unified"
+  lexicon_path: "lexicon/russian_mfa.dict"
+  raw_path: "C:/Users/Admin/thesis/data/unified"
+  preprocessed_path: "C:/Users/Admin/thesis/data/preprocessed_m2"
+
+preprocessing:
+  val_size: 512
+  text:
+    text_cleaners: ["basic_cleaners"]
+    language: "ru"
+  audio:
+    sampling_rate: 22050
+    max_wav_value: 32768.0
+  stft:
+    filter_length: 1024
+    hop_length: 256
+    win_length: 1024
+  mel:
+    n_mel_channels: 80
+    mel_fmin: 0
+    mel_fmax: 8000
+  pitch:
+    feature: "phoneme_level"
+    normalization: True
+  energy:
+    feature: "phoneme_level"
+    normalization: True

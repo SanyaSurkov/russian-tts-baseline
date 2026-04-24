@@ -10,61 +10,17 @@ russian_mfa.dict only knows unmarked phonemes. This module bridges the gap:
 
 Call from synthesize.preprocess_russian and any evaluation script that
 generates model input from raw text.
-
-Note on ruaccent format: ruaccent places '+' BEFORE the stressed vowel
-(e.g. 'ст+ол', 'к+от'), whereas accent.parse_stressed_word expects '+'
-AFTER the vowel ('сто+л'). This module uses _parse_vowel_idx() which
-handles ruaccent's actual output format.
 """
 import re
-from typing import List, Dict, Optional
+from typing import List, Dict
 
-from russian_frontend.accent import add_stress
+from russian_frontend.accent import add_stress, parse_stressed_word
 from russian_frontend.normalize import normalize
 from russian_frontend.stress_textgrid import STRESSED_VOWEL_MAP
 
 
 # Permit '+' and hyphen in word tokens (stressed/compound words).
 _WORD_RE = re.compile(r"[а-яё+\-]+", re.IGNORECASE)
-
-_RU_VOWELS = "аеёиоуыэюяaeiou"
-_VOWEL_RE = re.compile(f"[{_RU_VOWELS}]", re.IGNORECASE)
-
-
-def _parse_vowel_idx(word: str) -> Optional[int]:
-    """Return 0-based index of the stressed vowel among word's vowels.
-
-    Handles two '+' placement conventions:
-      - ruaccent format: '+' BEFORE stressed vowel  ('ст+ол', 'к+от')
-      - post-vowel format: '+' AFTER stressed vowel  ('сто+л', 'ко+т')
-
-    Detects which convention by checking the character adjacent to '+'.
-    Returns None if word has no '+' or the marker is not adjacent to a vowel.
-    """
-    if "+" not in word:
-        return None
-    plus_pos = word.index("+")
-
-    # Determine stressed vowel position in the original string
-    if plus_pos + 1 < len(word) and _VOWEL_RE.match(word[plus_pos + 1]):
-        # ruaccent format: '+' before vowel → stressed char is at plus_pos+1
-        # After removing '+', that char shifts to plus_pos
-        stressed_char_idx_in_clean = plus_pos
-    elif plus_pos > 0 and _VOWEL_RE.match(word[plus_pos - 1]):
-        # post-vowel format: '+' after vowel → stressed char is at plus_pos-1
-        # After removing '+', that char stays at plus_pos-1
-        stressed_char_idx_in_clean = plus_pos - 1
-    else:
-        return None
-
-    clean = word.replace("+", "")
-    vowel_count = 0
-    for i, ch in enumerate(clean):
-        if _VOWEL_RE.match(ch):
-            if i == stressed_char_idx_in_clean:
-                return vowel_count
-            vowel_count += 1
-    return None
 
 
 def read_lexicon(path: str) -> Dict[str, List[str]]:
@@ -100,7 +56,7 @@ def word_to_phones(stressed_word: str, lexicon: Dict[str, List[str]]) -> List[st
 
     phones = list(lexicon[clean])
 
-    vowel_idx = _parse_vowel_idx(stressed_word)
+    vowel_idx = parse_stressed_word(stressed_word)
     if vowel_idx is None:
         return phones
 

@@ -30,12 +30,17 @@ def test_unstressed_word_stays_unmarked():
 
 
 def test_parse_stressed_word_finds_vowel_index():
-    """parse_stressed_word returns 0-based index of stressed vowel among word's vowels."""
-    # "сто+л" → vowels = ["о"], stressed index = 0
+    """parse_stressed_word returns 0-based index of stressed vowel among word's vowels.
+
+    Supports both '+'-before (ruaccent native) and '+'-after (hand-written)."""
+    # '+'-before (ruaccent's actual output format):
+    assert parse_stressed_word("ст+ол") == 0           # stressed о (only vowel)
+    assert parse_stressed_word("дом+ой") == 1          # vowels [о, о], stressed 2nd
+    assert parse_stressed_word("зв+онит") == 0         # vowels [о, и], stressed 1st
+
+    # '+'-after (legacy format; keep supported for external fixtures):
     assert parse_stressed_word("сто+л") == 0
-    # "домо+й" → vowels = ["о", "о"], stressed = second → index 1
     assert parse_stressed_word("домо+й") == 1
-    # "зво+нит" → vowels = ["о", "и"], stressed index = 0
     assert parse_stressed_word("зво+нит") == 0
 
 

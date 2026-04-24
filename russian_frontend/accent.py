@@ -74,27 +74,40 @@ def add_stress(text: str) -> str:
 def parse_stressed_word(word: str) -> Optional[int]:
     """Return 0-based index of the stressed vowel among word's vowels.
 
+    ruaccent places '+' BEFORE the stressed vowel (e.g. 'ст+ол' = stressed о).
+    Some external data / hand-written fixtures use '+' AFTER (e.g. 'сто+л').
+    Both formats are accepted; '+'-before is checked first since it's the
+    native format produced by add_stress().
+
     Args:
-        word: a single word that may contain '+' after a vowel.
+        word: a single word containing at most one '+' adjacent to a vowel.
 
     Returns:
-        Index into the sequence of vowels in `word`, or None if no '+' marker.
+        Index into the sequence of vowels in `word`, or None if no
+        recognisable stress marker.
     """
     if "+" not in word:
         return None
 
     plus_pos = word.index("+")
-    if plus_pos == 0:
-        return None
-    if not _VOWEL_RE.match(word[plus_pos - 1]):
+
+    # '+'-before: stressed vowel is right after '+'
+    if plus_pos + 1 < len(word) and _VOWEL_RE.match(word[plus_pos + 1]):
+        stressed_char_idx = plus_pos + 1
+    # '+'-after: stressed vowel is just before '+'
+    elif plus_pos > 0 and _VOWEL_RE.match(word[plus_pos - 1]):
+        stressed_char_idx = plus_pos - 1
+    else:
         return None
 
     clean = word.replace("+", "")
-    stressed_char_idx = plus_pos - 1
+    # After removing '+', characters at positions > plus_pos shift left by 1.
+    clean_stressed_idx = stressed_char_idx - 1 if stressed_char_idx > plus_pos else stressed_char_idx
+
     vowel_count = 0
     for i, ch in enumerate(clean):
         if _VOWEL_RE.match(ch):
-            if i == stressed_char_idx:
+            if i == clean_stressed_idx:
                 return vowel_count
             vowel_count += 1
     return None

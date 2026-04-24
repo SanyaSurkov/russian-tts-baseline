@@ -45,7 +45,11 @@ def detect_speakers(raw_path: str) -> list:
 
 def run(cmd) -> None:
     print(f"\n>>> {' '.join(cmd)}")
-    subprocess.run(cmd, check=True)
+    env = os.environ.copy()
+    # Корень репозитория (где лежит папка scripts/)
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    env["PYTHONPATH"] = repo_root + os.pathsep + env.get("PYTHONPATH", "")
+    subprocess.run(cmd, check=True, env=env)
 
 
 def main():

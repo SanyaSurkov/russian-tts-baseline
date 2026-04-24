@@ -19,17 +19,14 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def read_lexicon(lex_path):
     lexicon = {}
-    with open(lex_path) as f:
-        lines = f.readlines()
-        for line in lines:
-            temp = re.split(r"\s+", line.strip("\n"))
-            word = temp[0]
-            phones = temp[5:]
-            if word.lower() not in lexicon:
-                lexicon[word.lower()] = phones
-           # if len(lexicon) >= 5:  # Вывести только первые 5 элементов словаря
-              #  break
-    #print(lexicon)
+    with open(lex_path, encoding='utf-8') as f:
+        for line in f:
+            if not line.strip(): continue
+            parts = line.strip().split()
+            word = parts[0].lower()
+            # В твоём словаре формат: слово prob prob prob prob фонемы...
+            if word not in lexicon:
+                lexicon[word] = parts[5:]
     return lexicon
 
 
@@ -61,28 +58,23 @@ def preprocess_english(text, preprocess_config):
 
 
 def preprocess_russian(text, preprocess_config):
-    lexicon = read_lexicon(preprocess_config["path"]["lexicon_path"])
+    """Raw Russian text → phoneme id sequence, with stress markers (M2).
 
-    phones = []
-    text = re.findall(r'[а-яА-ЯёЁ]+', text.lower())
+    Pipeline: normalize → add_stress → per-word lexicon lookup with stressed
+    vowel re-labelling. See russian_frontend.infer_phones.
+    """
+    from russian_frontend.infer_phones import text_to_phones
 
-    for p in text:
-        if p in lexicon:
-            phones += lexicon[p]
-           # phones += ['sp']
-        else:
-            phones.append("sp")
+    phones = text_to_phones(text, preprocess_config["path"]["lexicon_path"])
+    phones_str = "{" + "}{".join(phones) + "}"
+    phones_str = phones_str.replace("}{", " ")
 
-    phones = "{" + " ".join(phones) + "}"
-    print("Raw Text Sequence: {}".format(text))
-    print("Phoneme Sequence: {}".format(phones))
-    sequence = np.array(
-        text_to_sequence(
-            phones, preprocess_config["preprocessing"]["text"]["text_cleaners"]
-        )
-    )
-
-    return np.array(sequence)
+    print(f"Raw Text: {text}")
+    print(f"Phoneme Sequence: {phones_str}")
+    return np.array(text_to_sequence(
+        phones_str,
+        preprocess_config["preprocessing"]["text"]["text_cleaners"]
+    ))
 
 
 def synthesize(model, step, configs, vocoder, batchs, control_values):

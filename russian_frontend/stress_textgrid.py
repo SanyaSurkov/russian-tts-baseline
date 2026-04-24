@@ -53,9 +53,18 @@ def process_textgrid(
     skipped = 0
     mismatch = 0
 
-    for word_idx, word_interval in enumerate(word_tier.intervals):
+    # Enumerate only non-empty word intervals — build_stress_map also skips
+    # empty tokens, so indices stay aligned.
+    tg_idx = 0
+    for word_interval in word_tier.intervals:
         word_text = word_interval.text.strip()
-        key = (word_text, word_idx)
+        if not word_text:
+            continue
+        # MFA lowercases and collapses ё→е in word-tier text, so stress_map
+        # keys are already normalised to match. Defensive normalisation here
+        # in case a different MFA config ever preserves case/ё.
+        key = (word_text.lower().replace("ё", "е"), tg_idx)
+        tg_idx += 1
         if key not in stress_map:
             skipped += 1
             continue

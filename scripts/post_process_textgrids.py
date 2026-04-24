@@ -21,29 +21,48 @@ from tqdm import tqdm
 
 from russian_frontend.accent import parse_stressed_word
 from russian_frontend.stress_textgrid import process_textgrid
+import sys
+from pathlib import Path
+
 
 
 _WORD_RE = re.compile(r"\S+")
 _PUNCT_STRIP = re.compile(r"[^\w\+\-]", flags=re.UNICODE)
 
 
-def build_stress_map(stressed_text: str) -> dict:
-    """Parse stressed .lab content, produce {(word_no_plus, word_idx): vowel_idx}.
+def _normalize_key(word: str) -> str:
+    """Match MFA word-tier convention: strip punctuation, lowercase, collapse ё→е."""
+    clean = _PUNCT_STRIP.sub("", word)
+    clean = clean.replace("+", "")
+    clean = clean.lower().replace("ё", "е")
+    return clean
 
-    MFA word-tier strips most punctuation but keeps hyphens in compound words
-    like "по-русски". We mirror that: strip everything except letters/digits/
-    underscore/'+'/'-'.
+
+def build_stress_map(stressed_text: str) -> dict:
+    """Parse stressed .lab content, produce {(word_no_plus, flat_word_idx): vowel_idx}.
+
+    Must match MFA's word-tier index: MFA lowercases, collapses ё→е, and
+    splits compound words on '-' (e.g. "какие-нибудь" → ["какие", "нибудь"]).
+    We enumerate by the flat post-split index and lookup using the same
+    normalisation.
     """
-    words = _WORD_RE.findall(stressed_text)
+    tokens = _WORD_RE.findall(stressed_text)
     stress_map = {}
-    for idx, w in enumerate(words):
-        vowel_idx = parse_stressed_word(w)
-        if vowel_idx is None:
+    tg_idx = 0
+    for tok in tokens:
+        marked = _PUNCT_STRIP.sub("", tok)
+        if not marked:
             continue
-        clean = _PUNCT_STRIP.sub("", w).replace("+", "")
-        if not clean:
-            continue
-        stress_map[(clean, idx)] = vowel_idx
+        for sw in marked.split("-"):
+            if not sw:
+                continue
+            clean = sw.replace("+", "").lower().replace("ё", "е")
+            if not clean:
+                continue
+            vowel_idx = parse_stressed_word(sw)
+            if vowel_idx is not None:
+                stress_map[(clean, tg_idx)] = vowel_idx
+            tg_idx += 1
     return stress_map
 
 

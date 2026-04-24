@@ -15,7 +15,7 @@ def test_m2_config_paths_exist():
     assert pp["dataset"] == "MULTISPK_RU_M2"
     assert "MULTISPK_RU_M2" in pp["path"]["preprocessed_path"] or pp["path"]["preprocessed_path"].endswith("preprocessed_m2")
     assert tr["path"]["ckpt_path"].endswith("MULTISPK_RU_M2")
-    assert tr["step"]["save_step"] == 10000
+    assert tr["step"]["save_step"] > 0  # user tunes per machine
     assert mo["multi_speaker"] is True
 
 

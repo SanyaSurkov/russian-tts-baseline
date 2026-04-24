@@ -15,16 +15,16 @@ Usage:
 import argparse
 import os
 import random
+import sys
 from collections import Counter
 
 import tgt
 
+# Allow any phone in the model's inventory — only flag truly-unseen labels.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from text.cmudict import valid_symbols
 
-ALLOWED_VOWELS = {
-    "a", "e", "i", "o", "u", "ɨ",
-    "a+", "e+", "i+", "o+", "u+", "ɨ+",
-    "ɐ", "ə", "ɪ", "ʊ", "ɛ", "ʉ",  # unstressed allophones (pass-through)
-}
+ALLOWED_LABELS = set(valid_symbols) | {"sp", "spn", "sil", ""}
 
 
 def collect_phones(tg_path):
@@ -70,7 +70,7 @@ def main():
             n_with_plus += 1
         total_plus += sum(1 for p in m2_phones if "+" in p)
         for p in m2_phones:
-            if p and p not in ALLOWED_VOWELS and not p.isalpha() and p not in {"sp", "spn", "sil", ""}:
+            if p not in ALLOWED_LABELS:
                 unknown_labels[p] += 1
 
         # Count-match vs M1

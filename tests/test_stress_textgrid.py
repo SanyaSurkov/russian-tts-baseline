@@ -64,3 +64,29 @@ def test_process_textgrid_renames_stressed_vowels(tmp_path):
 def test_stressed_vowel_map_has_all_six():
     assert set(STRESSED_VOWEL_MAP.keys()) == {"a", "e", "i", "o", "u", "ɨ"}
     assert STRESSED_VOWEL_MAP["o"] == "o+"
+
+
+def test_process_textgrid_handles_yo_and_case(tmp_path):
+    """MFA word-tier is lowercase + ё→е; stress_map keys must match after
+    defensive normalisation in process_textgrid.
+    """
+    tg = tgt.core.TextGrid()
+    wt = tgt.core.IntervalTier(start_time=0.0, end_time=0.4, name="words")
+    # Simulate MFA output: uppercase + ё present (shouldn't happen, but defensive)
+    wt.add_interval(tgt.core.Interval(0.0, 0.4, "Ёлка"))
+    pt = tgt.core.IntervalTier(start_time=0.0, end_time=0.4, name="phones")
+    pt.add_interval(tgt.core.Interval(0.00, 0.10, "j"))
+    pt.add_interval(tgt.core.Interval(0.10, 0.20, "o"))
+    pt.add_interval(tgt.core.Interval(0.20, 0.30, "l"))
+    pt.add_interval(tgt.core.Interval(0.30, 0.40, "k"))
+    tg.add_tier(wt)
+    tg.add_tier(pt)
+
+    in_path = str(tmp_path / "yo.TextGrid")
+    out_path = str(tmp_path / "yo_out.TextGrid")
+    tgt.io.write_to_file(tg, in_path, format="long")
+
+    # stress_map key uses build_stress_map convention: lowercase + ё→е
+    stress_map = {("елка", 0): 0}
+    result = process_textgrid(in_path, stress_map, out_path)
+    assert result["ok"] == 1, result

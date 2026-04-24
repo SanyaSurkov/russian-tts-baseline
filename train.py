@@ -61,7 +61,7 @@ def main(args, configs):
             "{}.pth.tar".format(args.restore_step),
         )
         if os.path.isfile(ckpt_path):
-            ckpt = torch.load(ckpt_path, map_location=device)
+            ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
             if "scaler" in ckpt:
                 scaler.load_state_dict(ckpt["scaler"])
 

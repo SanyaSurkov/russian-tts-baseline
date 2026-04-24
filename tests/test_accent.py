@@ -18,13 +18,15 @@ def test_multi_word_phrase():
     assert result.count("+") >= 2  # at least two of three got stress
 
 
-def test_fallback_on_nonsense_word():
-    """Unknown/nonsense word falls back to last-vowel stress."""
+def test_unstressed_word_stays_unmarked():
+    """If ruaccent can't stress a word, leave it without '+'.
+
+    Heuristic fallback (last-vowel) is wrong for ~85% of Russian words —
+    better for the model to see base vowel labels and infer stress from
+    context than to train on systematically wrong markers.
+    """
     result = add_stress("блргзлы")
-    # Has one vowel "ы" — fallback places + after it
-    assert "+" in result
-    # Position: after the ы
-    assert "ы+" in result
+    assert "+" not in result
 
 
 def test_parse_stressed_word_finds_vowel_index():

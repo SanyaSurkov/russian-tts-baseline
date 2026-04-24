@@ -1,9 +1,13 @@
 # russian_frontend/accent.py
-"""ruaccent-based Russian stress marker with fallback.
+"""ruaccent-based Russian stress marker.
 
 add_stress(text) returns text with '+' inserted after each stressed vowel
-(ruaccent's native format). Words ruaccent fails to stress fall back to
-last-vowel stress (logged to logs/unstressed_words.txt).
+(ruaccent's native format). Words ruaccent fails to stress are left unchanged
+and logged to logs/unstressed_words.txt — no heuristic fallback (last-vowel
+stress is wrong for ~85% of Russian words).
+
+Downstream: post_process_textgrids.py skips any word without '+' in the
+stressed .lab → phoneme labels for that word stay as base MFA labels.
 
 Expose parse_stressed_word() to find the 0-based index of the stressed vowel
 among the word's vowels — used by stress_textgrid.py.
@@ -41,22 +45,15 @@ def _log_unstressed(word: str) -> None:
         f.write(word + "\n")
 
 
-def _fallback_last_vowel(word: str) -> str:
-    """Place + after the last vowel in the word."""
-    matches = list(_VOWEL_RE.finditer(word))
-    if not matches:
-        return word
-    last = matches[-1]
-    idx = last.end()
-    return word[:idx] + "+" + word[idx:]
-
-
 def add_stress(text: str) -> str:
-    """Add stress markers to Russian text using ruaccent, with fallback."""
+    """Add stress markers to Russian text using ruaccent.
+
+    Words ruaccent can't stress are left unchanged (no heuristic fallback) and
+    logged to logs/unstressed_words.txt for review.
+    """
     a = _get_accentizer()
     stressed = a.process_all(text)
 
-    # ruaccent may skip some words — detect words without vowels-with-'+' and apply fallback
     tokens = re.split(r"(\W+)", stressed)
     out = []
     for tok in tokens:
@@ -64,15 +61,13 @@ def add_stress(text: str) -> str:
             out.append(tok)
             continue
         if not _VOWEL_RE.search(tok):
-            # No vowel at all (punctuation or consonant-only like "к")
             out.append(tok)
             continue
         if "+" in tok:
             out.append(tok)
         else:
-            # Missing stress — log and fallback
             _log_unstressed(tok)
-            out.append(_fallback_last_vowel(tok))
+            out.append(tok)
     return "".join(out)
 
 
@@ -88,15 +83,12 @@ def parse_stressed_word(word: str) -> Optional[int]:
     if "+" not in word:
         return None
 
-    # Find the vowel immediately before the +
     plus_pos = word.index("+")
-    # The vowel is at plus_pos - 1 (if that char is a vowel)
     if plus_pos == 0:
         return None
     if not _VOWEL_RE.match(word[plus_pos - 1]):
         return None
 
-    # Count vowels up to and including the stressed one
     clean = word.replace("+", "")
     stressed_char_idx = plus_pos - 1
     vowel_count = 0

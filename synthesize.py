@@ -19,7 +19,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def read_lexicon(lex_path):
     lexicon = {}
-    with open(lex_path) as f:
+    with open(lex_path, encoding="utf-8") as f:
         lines = f.readlines()
         for line in lines:
             temp = re.split(r"\s+", line.strip("\n"))
